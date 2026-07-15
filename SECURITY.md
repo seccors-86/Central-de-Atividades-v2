@@ -2,7 +2,7 @@
 
 Não abra issues públicas para relatar vulnerabilidades ou expor dados pessoais.
 
-Use **Security → Report a vulnerability** no GitHub ou acesse o [formulário privado de vulnerabilidade](https://github.com/seccors-86/Central-de-Atividades-v2/security/advisories/new). Inclua impacto, passos de reprodução e uma sugestão de correção quando possível.
+Use **Security → Report a vulnerability** no GitHub ou acesse o [formulário privado de vulnerabilidade](https://github.com/seccors-86/Nuvyo/security/advisories/new). Inclua impacto, passos de reprodução e uma sugestão de correção quando possível.
 
 ## Requisitos para implantação
 

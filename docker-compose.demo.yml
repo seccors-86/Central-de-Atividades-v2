@@ -1,0 +1,7 @@
+services:
+  backend:
+    environment:
+      NODE_ENV: development
+      DEMO_USERS_ENABLED: "true"
+      FRONTEND_URL: ${DEMO_FRONTEND_URL:-http://localhost:8088}
+      CORS_ORIGINS: ${DEMO_FRONTEND_URL:-http://localhost:8088}

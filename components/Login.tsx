@@ -207,12 +207,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               </button>
             </div>}
 
-            {/* HMG Tag */}
-            <div className="mt-6 flex items-center justify-center">
-              <span className="px-3 py-1 bg-orange-50 border border-orange-200 rounded-full text-xs font-bold text-[#374A67] tracking-widest uppercase">
-                Ambiente de Homologação
-              </span>
-            </div>
           </div>
         </div>
 
