@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .card-premium {
+    @apply relative bg-white dark:bg-gray-800 rounded-[32px] border border-gray-100/50 dark:border-gray-700/50 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.05),0_15px_35px_-5px_rgba(0,0,0,0.03)] transition-all duration-500 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 overflow-hidden;
+  }
+  
+  .btn-primary {
+    @apply bg-[#374A67] text-white px-8 py-3 rounded-2xl shadow-[0_10px_20px_-10px_rgba(55,74,103,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(55,74,103,0.6)] hover:bg-[#4A6286] hover:-translate-y-0.5 transition-all font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-[#0E1116] text-white px-8 py-3 rounded-2xl shadow-[0_10px_20px_-10px_rgba(14,17,22,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(14,17,22,0.6)] hover:bg-[#243247] hover:-translate-y-0.5 transition-all font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-6 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 hover:border-gray-200 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200 hover:shadow-sm transition-all font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-95;
+  }
+
+  .status-badge {
+    @apply px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1.5;
+  }
+}

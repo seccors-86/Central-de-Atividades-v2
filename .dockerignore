@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+backend/node_modules
+dist
+backend/dist
+Descarte
+*.log
+.env*
+backend/.env*

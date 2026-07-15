@@ -1,0 +1,69 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+backend/node_modules
+backend/dist
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+backend/.env
+!.env.example
+!backend/.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Database
+*.db
+*.sqlite
+pgdata/
+postgres_data/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local backups
+backup/
+backups/
+*.dump
+*.bak
+backup_*.sql
+*_backup.sql
+
+# Uploads são dados de runtime e podem conter informações pessoais
+backend/uploads/
+
+# Arquivos não pertencentes ao projeto
+_arquivos_avulsos/
+*.orig
+*.rej
+patch_*.py

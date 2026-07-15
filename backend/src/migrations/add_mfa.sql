@@ -1,0 +1,13 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret_encrypted TEXT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery_hashes JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled_at TIMESTAMPTZ NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_used_step BIGINT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_by TEXT NULL REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO system_settings (key, value) VALUES ('mfa_required', 'false'::jsonb) ON CONFLICT (key) DO NOTHING;
