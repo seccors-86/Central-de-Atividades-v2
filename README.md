@@ -17,7 +17,47 @@
   <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-374A67">
 </p>
 
+> [!IMPORTANT]
+> ## 🤖 Não sabe instalar? Peça para um robô fazer com você
+>
+> A NUVYO possui um roteiro criado especialmente para pessoas sem conhecimento técnico. Um assistente de IA com acesso ao terminal pode seguir o documento para instalar localmente, publicar em uma VPS ou configurar Vercel + Supabase com segurança.
+>
+> **➡️ [ABRIR O GUIA DE INSTALAÇÃO ASSISTIDA — `Intall_By_Robo.md`](Intall_By_Robo.md)**
+>
+> Prompt sugerido: **“Leia o arquivo `Intall_By_Robo.md` inteiro e conduza minha instalação até todos os testes finais passarem, sem expor senhas nem apagar dados.”**
+
 NUVYO é uma aplicação web open source para organizar a execução do trabalho e dar visibilidade à gestão. Ela reúne projetos, tarefas, diário de bordo, clientes, equipes, áreas, KPIs, suporte, ideias e relatórios em uma interface responsiva.
+
+## Uma alternativa open source para gestão do trabalho
+
+Para equipes que pesquisam alternativas a Trello, ClickUp, Notion, Asana, monday.com, Jira ou Microsoft Planner, a NUVYO oferece uma proposta específica: reunir execução operacional e visão gerencial em uma aplicação open source, em português e que pode ser hospedada na própria infraestrutura.
+
+A NUVYO não pretende copiar essas plataformas nem substituí-las em todos os cenários. Cada produto possui profundidade, ecossistema e público próprios. A escolha faz sentido quando as características abaixo correspondem às necessidades da organização:
+
+- controle sobre hospedagem, banco de dados, backups e ciclo de atualização;
+- código aberto sob Apache 2.0, permitindo auditoria e personalização;
+- projetos, tarefas, Kanban, Gantt, diário de bordo e apontamento de horas no mesmo fluxo;
+- gestão por clientes, áreas hierárquicas, gestores e colaboradores;
+- KPIs de negócio associados aos projetos;
+- suporte interno, portal de ideias, comentários e notificações;
+- MFA TOTP, auditoria de eventos e permissões verificadas pela API;
+- interface e documentação orientadas ao português brasileiro.
+
+### Como a proposta se posiciona
+
+| Ferramenta | Abordagem conhecida | Quando considerar a NUVYO |
+| --- | --- | --- |
+| [Trello](https://trello.com/) | Organização visual por quadros, listas e cartões | Quando o Kanban precisa conviver com projetos, Gantt, KPIs, clientes, áreas e diário de bordo |
+| [ClickUp](https://clickup.com/features) | Plataforma ampla de gestão do trabalho, tarefas, documentos e colaboração | Quando a prioridade é uma alternativa open source autohospedável, com fluxo gerencial mais direcionado |
+| [Notion](https://www.notion.com/product) | Workspace flexível para conhecimento, documentos, bases e projetos | Quando a operação exige regras de acesso no backend, tarefas estruturadas, suporte, horas e indicadores integrados |
+| [Asana](https://asana.com/product) | Gestão colaborativa de projetos, fluxos, metas e recursos | Quando a organização quer manter aplicação e dados em infraestrutura própria e adaptar o código ao processo interno |
+| [monday.com](https://monday.com/work) | Plataforma configurável de gestão do trabalho baseada em quadros e fluxos | Quando é desejável começar com um modelo integrado de clientes, áreas, projetos, tarefas, KPIs e suporte |
+| [Jira](https://www.atlassian.com/software/jira/features) | Planejamento e acompanhamento de trabalho com fluxos altamente configuráveis | Quando o público é mais amplo que times técnicos e busca uma experiência em português voltada à gestão operacional |
+| [Microsoft Planner](https://www.microsoft.com/microsoft-365/planner/microsoft-planner) | Planejamento de tarefas e projetos conectado ao ecossistema Microsoft 365 | Quando a independência de um ecossistema SaaS e a possibilidade de autohospedagem são requisitos importantes |
+
+> NUVYO pode complementar ferramentas já adotadas ou ser avaliada como alternativa. A decisão deve considerar integrações necessárias, escala, suporte, maturidade operacional e custo total de hospedagem — não apenas a quantidade de funcionalidades.
+
+Os nomes e marcas citados pertencem aos seus respectivos proprietários. A NUVYO não possui afiliação com essas empresas.
 
 ## O que a plataforma oferece
 
@@ -84,8 +124,6 @@ O repositório possui três partes principais:
 | Vercel + Supabase | Iniciantes que preferem serviços gerenciados | Frontend na Vercel + banco no Supabase + API em host Node |
 
 > **Importante:** Supabase substitui o banco PostgreSQL, não a API Express. A API também grava uploads em disco. Por isso, a aplicação completa não deve ser colocada somente em Vercel Functions sem antes substituir o armazenamento local por um serviço de objetos.
-
-Se você quiser delegar a instalação a um assistente de IA, peça para ele ler e seguir integralmente o arquivo [`Intall_By_Robo.md`](Intall_By_Robo.md). Ele contém o roteiro operacional para instalação local, VPS e Vercel + Supabase.
 
 ## Instalação rápida com Docker
 
