@@ -85,6 +85,8 @@ O repositório possui três partes principais:
 
 > **Importante:** Supabase substitui o banco PostgreSQL, não a API Express. A API também grava uploads em disco. Por isso, a aplicação completa não deve ser colocada somente em Vercel Functions sem antes substituir o armazenamento local por um serviço de objetos.
 
+Se você quiser delegar a instalação a um assistente de IA, peça para ele ler e seguir integralmente o arquivo [`Intall_By_Robo.md`](Intall_By_Robo.md). Ele contém o roteiro operacional para instalação local, VPS e Vercel + Supabase.
+
 ## Instalação rápida com Docker
 
 ### Requisitos
@@ -240,7 +242,7 @@ DB_SSL=true
 DB_SSL_REJECT_UNAUTHORIZED=true
 JWT_SECRET=<resultado de openssl rand -hex 32>
 MFA_ENCRYPTION_KEY=<outro resultado de openssl rand -hex 32>
-BOOTSTRAP_ADMIN_LOGIN=admin@example.com
+BOOTSTRAP_ADMIN_LOGIN=99999999999
 BOOTSTRAP_ADMIN_PASSWORD=<senha forte com pelo menos 12 caracteres>
 FRONTEND_URL=https://app.seudominio.com
 CORS_ORIGINS=https://app.seudominio.com
