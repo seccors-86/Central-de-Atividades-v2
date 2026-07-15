@@ -96,8 +96,8 @@ O repositório possui três partes principais:
 ### 1. Baixe e configure
 
 ```bash
-git clone https://github.com/seccors-86/Central-de-Atividades-v2.git
-cd Central-de-Atividades-v2
+git clone https://github.com/seccors-86/Nuvyo.git
+cd Nuvyo
 cp .env.example .env
 ```
 
