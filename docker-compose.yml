@@ -11,6 +11,8 @@ services:
       - ./backend/src/migrations/schema_complete.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
       - ./backend/src/migrations/seed_minimal.sql:/docker-entrypoint-initdb.d/002-seed.sql:ro
       - ./backend/src/migrations/schema_evolution.sql:/docker-entrypoint-initdb.d/003-evolution.sql:ro
+      - ./backend/src/migrations/add_project_kpi_links.sql:/docker-entrypoint-initdb.d/004-project-kpi-links.sql:ro
+      - ./backend/src/migrations/add_password_recovery.sql:/docker-entrypoint-initdb.d/005-password-recovery.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5437}:5432"
     healthcheck:
@@ -36,6 +38,13 @@ services:
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
       DEMO_USERS_ENABLED: ${DEMO_USERS_ENABLED:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       PORT: 3001
       NODE_ENV: production
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8088}

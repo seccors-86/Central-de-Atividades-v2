@@ -30,6 +30,9 @@ export interface Project {
   depends_on_id?: string | null;
   private?: boolean;
   publicar_portal?: boolean;
+  kpi_ids?: string[];
+  kpis?: { id: string; name: string; position?: number }[];
+  /** Compatibilidade temporária com versões antigas que armazenavam apenas um texto. */
   kpi?: string;
 }
 

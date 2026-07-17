@@ -1,4 +1,8 @@
 services:
+  postgres:
+    volumes:
+      - ./backend/src/migrations/seed_demo.sql:/docker-entrypoint-initdb.d/006-demo.sql:ro
+
   backend:
     environment:
       NODE_ENV: development

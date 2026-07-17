@@ -31,6 +31,7 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
       throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
 
+    if (response.status === 204) return undefined;
     return await response.json();
   } catch (error) {
     console.error(`API request failed: ${endpoint}`, error);

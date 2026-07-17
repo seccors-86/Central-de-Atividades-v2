@@ -31,7 +31,7 @@ export const authService = {
   },
 
   recover: async (loginInfo: string) => {
-    const response = await fetch(`${API_URL}/auth/recover`, {
+    const response = await fetch(`${API_URL}/auth/recover/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -45,6 +45,23 @@ export const authService = {
     }
 
     return response.json();
+  },
+
+  getRecoveryConfig: async (): Promise<{ enabled: boolean }> => {
+    const response = await fetch(`${API_URL}/auth/recover/config`);
+    if (!response.ok) return { enabled: false };
+    return response.json();
+  },
+
+  resetRecoveredPassword: async (loginInfo: string, code: string, newPassword: string) => {
+    const response = await fetch(`${API_URL}/auth/recover/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: loginInfo, code, newPassword }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Não foi possível alterar a senha.');
+    return data;
   },
 
   logout: () => {

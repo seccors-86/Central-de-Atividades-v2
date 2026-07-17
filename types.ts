@@ -17,6 +17,7 @@ export interface User {
   avatarUrl?: string;
   cpf?: string;
   phone?: string;
+  email?: string;
   available_hours?: number;
   password?: string;
   pode_publicar?: boolean;
@@ -140,14 +141,77 @@ export interface Task {
 export interface AISummary {
   id: string;
   date: string;
+  title: string;
   content: string;
   periodStart: string;
   periodEnd: string;
+  templateId: string;
+  question?: string;
+  format: 'html' | 'markdown';
+  scopeType: 'all' | 'area' | 'client' | 'user';
+  scopeId?: string | null;
+  scopeLabel: string;
+  provider: string;
+  model?: string;
+  createdBy?: string | null;
+  createdByName?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
 }
 
 export interface AISummaryRequest {
-  logs: ActivityLog[];
-  users: User[];
+  templateId: string;
+  periodStart: string;
+  periodEnd: string;
+  scopeType: 'all' | 'area' | 'client' | 'user';
+  scopeId?: string | null;
+  question?: string;
+}
+
+export type AIProvider = 'google' | 'openai' | 'anthropic';
+
+export interface AIModelOption {
+  id: string;
+  name: string;
+}
+
+export interface AIReportTemplate {
+  id: string;
+  name: string;
+  description: string;
+  sections: AIReportTemplateSection[];
+  requiredScope: 'any' | 'client';
+  featured: boolean;
+  builtIn: boolean;
+}
+
+export interface AIReportTemplateSection {
+  id: string;
+  title: string;
+  instructions: string;
+  variables: string[];
+}
+
+export interface AIReportVariable {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+}
+
+export interface AIStatus {
+  enabled: boolean;
+  provider: string;
+  providerLabel: string;
+  model: string;
+}
+
+export interface AIConfiguration {
+  enabled: boolean;
+  provider: AIProvider;
+  model: string;
+  hasApiKey: boolean;
+  providers: Array<{ id: AIProvider; name: string }>;
 }
 
 // Gamification Types

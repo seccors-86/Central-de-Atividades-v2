@@ -22,9 +22,9 @@
 >
 > A NUVYO possui um roteiro criado especialmente para pessoas sem conhecimento técnico. Um assistente de IA com acesso ao terminal pode seguir o documento para instalar localmente, publicar em uma VPS ou configurar Vercel + Supabase com segurança.
 >
-> **➡️ [ABRIR O GUIA DE INSTALAÇÃO ASSISTIDA — `Intall_By_Robo.md`](Intall_By_Robo.md)**
+> **➡️ [ABRIR O GUIA DE INSTALAÇÃO ASSISTIDA — `INSTALL_BY_ROBO.md`](INSTALL_BY_ROBO.md)**
 >
-> Prompt sugerido: **“Leia o arquivo `Intall_By_Robo.md` inteiro e conduza minha instalação até todos os testes finais passarem, sem expor senhas nem apagar dados.”**
+> Prompt sugerido: **“Leia o arquivo `INSTALL_BY_ROBO.md` inteiro e conduza minha instalação até todos os testes finais passarem, sem expor senhas nem apagar dados.”**
 
 NUVYO é uma aplicação web open source para organizar a execução do trabalho e dar visibilidade à gestão. Ela reúne projetos, tarefas, diário de bordo, clientes, equipes, áreas, KPIs, suporte, ideias e relatórios em uma interface responsiva.
 
@@ -69,7 +69,7 @@ Os nomes e marcas citados pertencem aos seus respectivos proprietários. A NUVYO
 - KPIs configuráveis; a instalação começa com **Receita Bruta**, **Vendas** e **Novos Clientes**.
 - Gestão de clientes, usuários, hierarquia de áreas, permissões e configurações operacionais.
 - Portal de ideias, chamados de suporte, lixeira e recuperação de registros.
-- Resumos com IA via Google Gemini, opcional e desativado quando não há chave configurada.
+- Relatórios com IA via Google Gemini, OpenAI ou Anthropic Claude, com filtros, perguntas livres, histórico e exportação em PDF.
 - Tema claro/escuro e experiência adaptada para desktop e dispositivos móveis.
 
 ### Perfis de acesso
@@ -94,7 +94,7 @@ React + Vite ──────────────── Nginx ou Vercel
 Express + TypeScript ──────── container/serviço Node persistente
    ├── PostgreSQL ─────────── Docker ou Supabase
    ├── volume de uploads ──── avatares e imagens
-   └── Google Gemini ──────── integração opcional
+   └── provedor de IA ─────── Gemini, OpenAI ou Claude (opcional)
 ```
 
 O repositório possui três partes principais:
@@ -156,7 +156,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Acesse [http://localhost:8088](http://localhost:8088). O endpoint de saúde fica em [http://localhost:8088/health](http://localhost:8088/health).
+A landing page pública fica em [http://localhost:8088](http://localhost:8088) e o acesso ao sistema em [http://localhost:8088/app](http://localhost:8088/app). O endpoint de saúde fica em [http://localhost:8088/health](http://localhost:8088/health).
 
 No primeiro início, as migrações criam o banco e a API provisiona o administrador informado no `.env`. Essas credenciais deixam de ser usadas para provisionamento assim que existe um administrador.
 
@@ -178,13 +178,13 @@ Os volumes `postgres_data` e `uploads_data` preservam banco e arquivos. `docker 
 
 ### Modo de demonstração local
 
-Para avaliar os três níveis de acesso sem cadastrar usuários manualmente, use o arquivo de demonstração:
+Para avaliar os três níveis de acesso e todos os módulos sem cadastrar dados manualmente, use o arquivo de demonstração:
 
 ```bash
 docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml up -d --build
 ```
 
-Ele cria ou restaura estas contas somente no ambiente local:
+O modo demo usa volumes próprios e carrega uma empresa fictícia completa: áreas, clientes, equipe, projetos em diferentes fases, tarefas, diário de bordo, chamados, comentários, notificações, gamificação, campanhas, resumo gerencial e sugestões. Ele também cria ou restaura estas contas somente no ambiente local:
 
 | Perfil | Login | Senha |
 | --- | --- | --- |
@@ -192,13 +192,21 @@ Ele cria ou restaura estas contas somente no ambiente local:
 | Gestor | `88888888899` | `88888888899` |
 | Colaborador | `88888888800` | `88888888800` |
 
-Abra [http://localhost:8088](http://localhost:8088). Para excluir completamente os dados da demonstração:
+Abra [http://localhost:8088/app](http://localhost:8088/app). Para excluir completamente os dados da demonstração:
 
 ```bash
 docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml down -v
 ```
 
 > Essas credenciais são públicas e previsíveis. `DEMO_USERS_ENABLED=true` é recusado quando `NODE_ENV=production`; nunca altere essa proteção nem exponha o modo demo à internet.
+
+Os dados usam IDs iniciados por `demo-` e datas relativas ao dia em que a base é criada. Para atualizar os prazos e restaurar o conteúdo fictício sem recriar os contêineres:
+
+```bash
+docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml \
+  exec -T postgres psql -U postgres -d central_atividades -v ON_ERROR_STOP=1 \
+  < backend/src/migrations/seed_demo.sql
+```
 
 ## Desenvolvimento local
 
@@ -339,14 +347,107 @@ Somente valores públicos podem usar o prefixo `VITE_`.
 | `DB_SSL_REJECT_UNAUTHORIZED` | recomendada | Mantém a validação do certificado TLS |
 | `DB_POOL_MAX` | não | Máximo de conexões; padrão `20` |
 | `JWT_SECRET` | sim | Assina as sessões; mínimo de 32 caracteres |
-| `MFA_ENCRYPTION_KEY` | sim | Protege segredos TOTP com AES-256-GCM |
+| `MFA_ENCRYPTION_KEY` | sim | Protege segredos TOTP e chaves de provedores de IA com AES-256-GCM |
 | `FRONTEND_URL` / `CORS_ORIGINS` | sim | Origens autorizadas, separadas por vírgula |
 | `BOOTSTRAP_ADMIN_LOGIN` | primeiro início | Login do administrador inicial |
 | `BOOTSTRAP_ADMIN_PASSWORD` | primeiro início | Senha inicial, mínimo de 12 caracteres |
 | `DEMO_USERS_ENABLED` | não | Cria as contas previsíveis de demonstração; proibido em produção |
-| `GEMINI_API_KEY` | não | Habilita os recursos de IA |
+| `GEMINI_API_KEY` | não | Compatibilidade legada para Gemini; prefira configurar a IA pelo frontend |
+| `SMTP_HOST` / `SMTP_PORT` | para recuperar senha | Servidor SMTP e porta; normalmente `587` com STARTTLS ou `465` com TLS direto |
+| `SMTP_SECURE` | não | Use `true` para TLS direto na porta 465; padrão `false` |
+| `SMTP_REQUIRE_TLS` | recomendada | Exige STARTTLS quando `SMTP_SECURE=false`; padrão `true` |
+| `SMTP_USER` / `SMTP_PASSWORD` | conforme provedor | Credenciais do remetente; nunca versionar |
+| `SMTP_FROM` | para recuperar senha | Remetente, por exemplo `NUVYO <nao-responda@seudominio.com>` |
 
 Veja todos os campos em [`.env.example`](.env.example) e [`backend/.env.example`](backend/.env.example).
+
+## Recuperação de senha por e-mail
+
+O link **Esqueci minha senha** envia um código de seis dígitos para o e-mail do usuário. O código expira em 10 minutos, aceita no máximo cinco tentativas e só pode ser usado uma vez. Uma troca bem-sucedida revoga as sessões existentes, preserva o MFA e exige uma nova senha com pelo menos 12 caracteres, diferente do login.
+
+Para ativar o recurso:
+
+1. configure um servidor SMTP no backend;
+2. cadastre um e-mail único no perfil de cada usuário que poderá recuperar a senha;
+3. recrie o backend para carregar as variáveis;
+4. confirme que o endpoint de configuração informa `{"enabled":true}`;
+5. solicite um código pela tela de login e confirme a chegada na caixa de entrada.
+
+### Teste com Gmail
+
+Uma conta Gmail comum pode ser usada em testes. Ative a verificação em duas etapas na conta Google e crie uma [senha de app](https://support.google.com/accounts/answer/185833?hl=pt-BR). Não use a senha normal da conta. Copie os 16 caracteres da senha de app sem espaços e mantenha o remetente igual à conta autenticada:
+
+```dotenv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_REQUIRE_TLS=true
+SMTP_USER=seuemail@gmail.com
+SMTP_PASSWORD=<senha-de-app-com-16-caracteres-sem-espacos>
+SMTP_FROM="NUVYO <seuemail@gmail.com>"
+```
+
+Proteja o arquivo e recrie somente o backend:
+
+```bash
+chmod 600 .env
+docker compose up -d --force-recreate backend
+curl -fsS http://localhost:8088/api/auth/recover/config
+```
+
+Resultado esperado:
+
+```json
+{"enabled":true}
+```
+
+Em uma VPS com domínio, troque `localhost:8088` pela URL pública. Se o e-mail não chegar, verifique o spam e consulte `docker compose logs --tail=100 backend` sem publicar a saída caso ela contenha dados sensíveis.
+
+> [!CAUTION]
+> Nunca envie `SMTP_PASSWORD` por chat, issue, commit ou captura de tela. Se uma senha de app for exibida, revogue-a imediatamente e gere outra. Para produção, prefira uma conta remetente exclusiva ou um provedor de e-mail transacional e configure SPF, DKIM e DMARC no domínio.
+
+## Relatórios com Inteligência Artificial
+
+Administradores e gestores podem gerar relatórios usando dados da própria NUVYO. O backend aplica novamente as permissões antes de montar o contexto: o administrador pode analisar toda a empresa; o gestor fica limitado à sua área e subáreas. Colaboradores não possuem acesso ao módulo.
+
+O gerador oferece:
+
+- templates editáveis para resumo executivo, portfólio, produtividade, riscos e acompanhamento de cliente;
+- **Gestor de Projetos Sênior**, que diagnostica o portfólio e propõe decisões e um plano de ação para 7, 30 e 90 dias;
+- construtor visual no qual o superadmin cria, duplica, reordena e exclui seções e escolhe as variáveis analisadas em cada uma;
+- período de até 366 dias;
+- escopo por toda a empresa/estrutura, área, cliente ou colaborador;
+- campo livre para perguntas adicionais;
+- saída em HTML sanitizado e formatado para apresentação;
+- histórico persistente com provedor, modelo, período, escopo e autor;
+- exportação para PDF pelo diálogo de impressão do navegador.
+
+### Configurar o provedor
+
+Entre como superadmin e abra **Configurações → Configurar Inteligência Artificial**:
+
+1. escolha **Google Gemini**, **OpenAI** ou **Anthropic Claude**;
+2. cole a chave diretamente no campo protegido;
+3. clique em **Carregar modelos disponíveis**;
+4. selecione um dos modelos liberados para aquela chave;
+5. salve e mantenha o recurso ativo.
+
+A lista não é fixa no código: o backend consulta o endpoint de modelos do próprio provedor, portanto só apresenta modelos disponíveis para a chave informada. Consulte as referências oficiais do [Gemini](https://ai.google.dev/api/models), da [OpenAI](https://developers.openai.com/api/reference/resources/models/methods/list) e da [Anthropic](https://platform.claude.com/docs/en/api/models/list).
+
+A chave nunca é retornada pelo backend. Ela é cifrada com AES-256-GCM usando uma chave derivada de `MFA_ENCRYPTION_KEY` e armazenada em `system_settings`. Não altere `MFA_ENCRYPTION_KEY` em uma instalação existente sem um plano de rotação e recadastro dos segredos.
+
+> [!IMPORTANT]
+> Os registros autorizados do período são enviados ao provedor selecionado para processamento. Antes de usar dados reais, avalie contrato, retenção, região, privacidade, custos e políticas internas do provedor. Títulos e descrições são tratados como dados não confiáveis, o HTML retornado é sanitizado e a chave da API permanece somente no backend.
+
+`GEMINI_API_KEY` continua aceito no ambiente para compatibilidade com instalações antigas. Novas instalações devem preferir a configuração pelo frontend, que permite trocar provedor e modelo sem recriar o container.
+
+### Personalizar templates
+
+O superadmin acessa **Configurações → Templates de Relatórios IA**. Cada template possui nome, descrição, regra de escopo e seções ordenadas. Em cada seção é possível escrever a orientação da análise e selecionar somente os dados necessários: projetos, status, progresso, prazos, KPIs, tarefas, bloqueios, dependências, equipe, diário de bordo, clientes, carga de trabalho e riscos.
+
+Templates podem ser criados, duplicados, editados ou excluídos. A exclusão é lógica e não remove os relatórios já gerados. **Restaurar padrões** recupera os templates oficiais da NUVYO sem apagar os personalizados. O template **Gestor de Projetos Sênior** funciona sobre toda a empresa ou sobre os mesmos filtros de área, cliente e colaborador disponíveis no gerador.
+
+As regras globais de segurança, autorização e formato ficam no backend e não podem ser alteradas pelo editor. Somente o superadmin gerencia templates; administradores e gestores podem utilizá-los conforme seu escopo de acesso.
 
 ## Segurança e MFA
 
@@ -354,6 +455,7 @@ Entre os controles implementados estão:
 
 - sessão em cookie `HttpOnly`, `Secure` e `SameSite=Strict`, sem JWT no `localStorage`;
 - senhas com bcrypt, comparação resistente à enumeração, bloqueio progressivo e rate limiting;
+- recuperação de senha por código de e-mail com hash HMAC, expiração de 10 minutos, cinco tentativas e resposta antienumeração;
 - autorização no servidor por perfil, área, propriedade e compartilhamento;
 - MFA TOTP compatível com Microsoft Authenticator, Google Authenticator, Duo e outros aplicativos RFC 6238;
 - segredos TOTP cifrados com AES-256-GCM e códigos de recuperação de uso único;
@@ -363,6 +465,8 @@ Entre os controles implementados estão:
 - varredura de dependências e segredos no GitHub Actions.
 
 O administrador ativa ou desativa a exigência global em **Configurações de Gestão → Segurança e MFA**. Ao ativar, usuários ainda não cadastrados recebem um QR Code no próximo acesso.
+
+As respostas da recuperação são neutras: a API nunca informa publicamente se um CPF, telefone ou e-mail está cadastrado. Isso reduz a enumeração de usuários, mas não substitui o rate limiting, o monitoramento e a proteção da conta de e-mail.
 
 Leia a [política de segurança](SECURITY.md) antes de publicar. Os controles técnicos ajudam em auditorias, mas uma certificação ISO 27001 depende também do SGSI da organização: processos, análise de riscos, responsáveis, evidências, backups, continuidade e resposta a incidentes.
 

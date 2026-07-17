@@ -117,7 +117,7 @@ export const ProjectConfigManagerModal: React.FC<ProjectConfigManagerModalProps>
   };
 
   const removeKpi = async (id: string) => {
-    if (!confirm('Excluir este KPI? Projetos existentes manterão o texto atual.')) return;
+    if (!confirm('Excluir este KPI? O vínculo será removido de todos os projetos relacionados.')) return;
     await deleteProjectKpi(id);
     emitChange({ categories, statuses, kpis: kpis.filter(kpi => kpi.id !== id) });
   };

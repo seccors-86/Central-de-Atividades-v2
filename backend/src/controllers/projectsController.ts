@@ -6,6 +6,44 @@ import { triggerPortalSync } from '../utils/portalWebhook.js';
 
 const genId = () => randomBytes(4).toString('hex').toUpperCase();
 
+const normalizeKpiIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id): id is string => typeof id === 'string').map(id => id.trim()).filter(Boolean))].slice(0, 50);
+};
+
+const getProjectKpis = async (db: { query: Function }, projectId: string) => {
+  const result = await db.query(
+    `SELECT pk.id, pk.name, pk.position
+     FROM project_kpi_links pkl
+     JOIN project_kpis pk ON pk.id = pkl.kpi_id
+     WHERE pkl.project_id = $1
+     ORDER BY pk.position, LOWER(pk.name)`,
+    [projectId]
+  );
+  return result.rows;
+};
+
+const syncProjectKpis = async (db: { query: Function }, projectId: string, rawKpiIds: unknown) => {
+  const kpiIds = normalizeKpiIds(rawKpiIds);
+  if (kpiIds.length > 0) {
+    const existing = await db.query('SELECT id FROM project_kpis WHERE id = ANY($1::text[])', [kpiIds]);
+    if (existing.rows.length !== kpiIds.length) {
+      const error = new Error('Um ou mais KPIs selecionados não existem.');
+      (error as any).code = 'INVALID_PROJECT_KPI';
+      throw error;
+    }
+  }
+  await db.query('DELETE FROM project_kpi_links WHERE project_id = $1', [projectId]);
+  if (kpiIds.length > 0) {
+    await db.query(
+      `INSERT INTO project_kpi_links (project_id, kpi_id)
+       SELECT $1, UNNEST($2::text[])`,
+      [projectId, kpiIds]
+    );
+  }
+  return kpiIds;
+};
+
 // ─── HELPER ─────────────────────────────────────────────────────────────────
 // Retorna a cláusula WHERE de acesso: o usuário vê apenas projetos da sua área
 // OU projetos em que ele foi explicitamente adicionado como membro.
@@ -79,6 +117,16 @@ export const getProjects = async (req: Request, res: Response) => {
 
     let query = `
       SELECT p.*,
+        COALESCE((
+          SELECT json_agg(json_build_object('id', pk.id, 'name', pk.name, 'position', pk.position) ORDER BY pk.position, LOWER(pk.name))
+          FROM project_kpi_links pkl JOIN project_kpis pk ON pk.id = pkl.kpi_id
+          WHERE pkl.project_id = p.id
+        ), '[]'::json) AS kpis,
+        COALESCE((
+          SELECT json_agg(pk.id ORDER BY pk.position, LOWER(pk.name))
+          FROM project_kpi_links pkl JOIN project_kpis pk ON pk.id = pkl.kpi_id
+          WHERE pkl.project_id = p.id
+        ), '[]'::json) AS kpi_ids,
         COUNT(DISTINCT pa.id)::int AS total_activities,
         COUNT(DISTINCT pa.id) FILTER (WHERE pa.status = 'done' OR pa.progress = 100)::int AS completed_activities,
         COALESCE((
@@ -102,7 +150,15 @@ export const getProjects = async (req: Request, res: Response) => {
 
     if (status) { query += ` AND p.status = $${idx}`; params.push(status); idx++; }
     if (category) { query += ` AND p.category = $${idx}`; params.push(category); idx++; }
-    if (responsible) { query += ` AND p.responsible ILIKE $${idx}`; params.push(`%${responsible}%`); idx++; }
+    if (responsible) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM users responsible_user
+        WHERE responsible_user.id = p.owner_id
+          AND responsible_user.name ILIKE $${idx}
+      )`;
+      params.push(`%${responsible}%`);
+      idx++;
+    }
     if (search) {
       query += ` AND (p.name ILIKE $${idx} OR p.description ILIKE $${idx})`;
       params.push(`%${search}%`); idx++;
@@ -129,7 +185,7 @@ export const getProjects = async (req: Request, res: Response) => {
       }
       return {
         ...p,
-        progress: p.progress > 0 ? p.progress : calcProgress,
+        progress: calcProgress,
         total_hours: Number((p.total_duration_seconds / 3600).toFixed(1)) || 0,
         selected_phases: p.selected_phases || [],
         documents: p.documents || [],
@@ -156,6 +212,16 @@ export const getProjectById = async (req: Request, res: Response) => {
 
     const result = await pool.query(
       `SELECT p.*,
+        COALESCE((
+          SELECT json_agg(json_build_object('id', pk.id, 'name', pk.name, 'position', pk.position) ORDER BY pk.position, LOWER(pk.name))
+          FROM project_kpi_links pkl JOIN project_kpis pk ON pk.id = pkl.kpi_id
+          WHERE pkl.project_id = p.id
+        ), '[]'::json) AS kpis,
+        COALESCE((
+          SELECT json_agg(pk.id ORDER BY pk.position, LOWER(pk.name))
+          FROM project_kpi_links pkl JOIN project_kpis pk ON pk.id = pkl.kpi_id
+          WHERE pkl.project_id = p.id
+        ), '[]'::json) AS kpi_ids,
         COUNT(DISTINCT pa.id)::int AS total_activities,
         COUNT(DISTINCT pa.id) FILTER (WHERE pa.status = 'done' OR pa.progress = 100)::int AS completed_activities,
         COALESCE((
@@ -219,7 +285,7 @@ export const getProjectById = async (req: Request, res: Response) => {
     
     res.json({ 
       ...project, 
-      progress: project.progress > 0 ? project.progress : calcProgress,
+      progress: calcProgress,
       total_hours: Number((project.total_duration_seconds / 3600).toFixed(1)) || 0,
       shared_with: project.shared_with || [] 
     });
@@ -229,25 +295,27 @@ export const getProjectById = async (req: Request, res: Response) => {
 };
 
 export const createProject = async (req: Request, res: Response) => {
+  const db = await pool.connect();
   try {
+    await db.query('BEGIN');
     const user = (req as any).user;
     const {
       name, description, category, phase, selected_phases, status,
       start_date, end_date, owner_id, dono_id, client_id, demandante_area_id, documents,
-      area_id, parent_id, depends_on_id, private: isPrivate, publicar_portal, other_members
+      area_id, parent_id, depends_on_id, private: isPrivate, publicar_portal, other_members, kpi_ids
     } = req.body;
 
     if (!name || !category || !phase) {
       return res.status(400).json({ error: 'Nome, categoria e fase são obrigatórios.' });
     }
 
-    const userRes = await pool.query('SELECT pode_publicar FROM users WHERE id = $1', [user.id]);
+    const userRes = await db.query('SELECT pode_publicar FROM users WHERE id = $1', [user.id]);
     const userPodePublicar = userRes.rows[0]?.pode_publicar === true;
     const canPublish = user.role === 'admin' || userPodePublicar;
     const finalPublicarPortal = canPublish ? Boolean(publicar_portal) : false;
 
     const id = `PRJ-${genId()}`;
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO projects
         (id, name, description, category, phase, selected_phases, status,
          start_date, end_date, owner_id, dono_id, client_id, demandante_area_id,
@@ -270,31 +338,49 @@ export const createProject = async (req: Request, res: Response) => {
       ]
     );
 
+    await syncProjectKpis(db, id, kpi_ids);
+
     if (Array.isArray(other_members)) {
       for (const memberId of other_members) {
-        await pool.query(
+        await db.query(
           'INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (project_id, user_id) DO UPDATE SET role = $3',
           [id, memberId, 'editor']
         );
       }
     }
 
+    const linkedKpis = await getProjectKpis(db, id);
+    await db.query('COMMIT');
+
     if (finalPublicarPortal) {
       triggerPortalSync();
     }
 
-    res.status(201).json({ ...result.rows[0], shared_with: other_members || [] });
+    res.status(201).json({
+      ...result.rows[0],
+      kpis: linkedKpis,
+      kpi_ids: linkedKpis.map((kpi: any) => kpi.id),
+      shared_with: other_members || []
+    });
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error('createProject error:', err);
+    if ((err as any)?.code === 'INVALID_PROJECT_KPI') {
+      return res.status(400).json({ error: (err as Error).message });
+    }
     res.status(500).json({ error: 'Erro ao criar projeto.' });
+  } finally {
+    db.release();
   }
 };
 
 export const updateProject = async (req: Request, res: Response) => {
+  let db: any;
   try {
     const { id } = req.params;
     const user = (req as any).user;
     const fields = req.body;
+    const kpiIdsProvided = Object.prototype.hasOwnProperty.call(fields, 'kpi_ids');
 
     // Verifica se tem permissão de edição (dono da área ou editor/owner compartilhado)
     const access = await pool.query(
@@ -349,20 +435,31 @@ export const updateProject = async (req: Request, res: Response) => {
       }
     }
 
-    if (setClauses.length === 0) {
+    if (setClauses.length === 0 && !kpiIdsProvided && !Array.isArray(fields.other_members)) {
       return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
     }
 
-    setClauses.push(`updated_at = NOW()`);
-    values.push(id);
+    db = await pool.connect();
+    await db.query('BEGIN');
 
-    const result = await pool.query(
-      `UPDATE projects SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    );
+    let result;
+    if (setClauses.length > 0) {
+      setClauses.push(`updated_at = NOW()`);
+      values.push(id);
+      result = await db.query(
+        `UPDATE projects SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+        values
+      );
+    } else {
+      result = await db.query('SELECT * FROM projects WHERE id = $1', [id]);
+    }
+
+    if (kpiIdsProvided) {
+      await syncProjectKpis(db, id, fields.kpi_ids);
+    }
 
     if (Array.isArray(fields.selected_phases)) {
-      await pool.query(
+      await db.query(
         `UPDATE tasks SET flow_step = 'Sem fase específica' 
          WHERE project_id = $1 AND flow_step NOT IN (SELECT jsonb_array_elements_text($2::jsonb))`,
         [id, JSON.stringify(fields.selected_phases)]
@@ -370,34 +467,47 @@ export const updateProject = async (req: Request, res: Response) => {
     }
 
     if (fields.archived === true) {
-      await pool.query('UPDATE tasks SET archived = true WHERE project_id = $1', [id]);
+      await db.query('UPDATE tasks SET archived = true WHERE project_id = $1', [id]);
     }
 
     if (Array.isArray(fields.other_members)) {
       // First, get current members added via this UI (we don't want to remove 'owner' role or people added specifically via share modal? Actually, the share modal allows managing all editors/viewers. To be safe, we just clear and add, but preserving owner is handled by owner_id field on projects table, though project_members might have role='owner'. Better to just sync 'editor' role for the provided IDs, and remove editors not in the list. To avoid deleting members added via share modal, maybe we shouldn't delete, or we just sync completely.)
       // Let's do a full sync: remove all editors/viewers that are not in `other_members` (and keep owners, though owner is usually set via owner_id in projects).
-      await pool.query('DELETE FROM project_members WHERE project_id = $1 AND role != $2', [id, 'owner']);
+      await db.query('DELETE FROM project_members WHERE project_id = $1 AND role != $2', [id, 'owner']);
       for (const memberId of fields.other_members) {
-        await pool.query(
+        await db.query(
           'INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (project_id, user_id) DO UPDATE SET role = $3',
           [id, memberId, 'editor']
         );
       }
     }
 
+    const linkedKpis = await getProjectKpis(db, id);
+    await db.query('COMMIT');
+
     if (fields.publicar_portal !== undefined && (fields.publicar_portal || currentPublicarPortal)) {
       triggerPortalSync();
     }
-
-    res.json({ ...result.rows[0], shared_with: fields.other_members || [] });
+    res.json({
+      ...result.rows[0],
+      kpis: linkedKpis,
+      kpi_ids: linkedKpis.map((kpi: any) => kpi.id),
+      shared_with: fields.other_members || []
+    });
   } catch (err) {
+    if (db) await db.query('ROLLBACK');
     console.error('updateProject error:', {
       message: (err as any)?.message,
       detail: (err as any)?.detail,
       code: (err as any)?.code,
       stack: (err as any)?.stack,
     });
+    if ((err as any)?.code === 'INVALID_PROJECT_KPI') {
+      return res.status(400).json({ error: (err as Error).message });
+    }
     res.status(500).json({ error: 'Erro ao atualizar projeto.' });
+  } finally {
+    if (db) db.release();
   }
 };
 

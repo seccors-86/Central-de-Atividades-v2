@@ -37,6 +37,8 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { ensureSecurityAuditTable, recordSecurityEvent } from './security/audit.js';
 import { provisionDemoUsers } from './config/demoUsers.js';
+import { ensurePasswordRecoverySchema, ensureProjectKpiSchema } from './security/passwordRecovery.js';
+import { ensureAIReportsSchema } from './security/aiReports.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,6 +165,9 @@ const startServer = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     await pool.query("INSERT INTO system_settings (key, value) VALUES ('mfa_required', 'false'::jsonb) ON CONFLICT (key) DO NOTHING");
     await ensureSecurityAuditTable();
+    await ensureProjectKpiSchema();
+    await ensurePasswordRecoverySchema();
+    await ensureAIReportsSchema();
     await provisionDemoUsers();
     console.log('✅ Database connection successful');
 

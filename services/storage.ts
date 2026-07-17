@@ -70,6 +70,7 @@ export const getUsers = async (): Promise<User[]> => {
     available_hours: user.available_hours ? Number(user.available_hours) : undefined,
     cpf: user.cpf,
     phone: user.phone,
+    email: user.email,
     pode_publicar: user.pode_publicar,
     mfaEnabled: user.mfa_enabled === true,
   }));
@@ -99,6 +100,7 @@ export const updateUser = async (updatedUser: User): Promise<void> => {
     avatarUrl: updatedUser.avatarUrl,
     cpf: updatedUser.cpf,
     phone: updatedUser.phone,
+    email: updatedUser.email,
     password: updatedUser.password,
     pode_publicar: updatedUser.pode_publicar,
   });
@@ -198,8 +200,4 @@ export const deleteTask = async (id: string): Promise<void> => {
 
 export const getAISummaries = async (): Promise<AISummary[]> => {
   return await api.get("/ai-summaries");
-};
-
-export const saveAISummary = async (summary: AISummary): Promise<void> => {
-  await api.post("/ai-summaries", summary);
 };

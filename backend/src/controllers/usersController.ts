@@ -9,9 +9,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const canViewContactData = ['admin', 'manager'].includes(req.user?.role);
     const fields = canViewContactData
-      ? 'id, name, role, area_id, cpf, phone, avatar_url, created_at, available_hours, pode_publicar, mfa_enabled'
-      : 'id, name, role, area_id, avatar_url, created_at, available_hours, pode_publicar, mfa_enabled';
-    const result = await query(`SELECT ${fields} FROM users ORDER BY name`);
+      ? 'id, name, role, area_id, cpf, phone, email, avatar_url, created_at, available_hours, pode_publicar, mfa_enabled'
+      : `id, name, role, area_id, avatar_url, created_at, available_hours, pode_publicar, mfa_enabled,
+         CASE WHEN id = $1 THEN email ELSE NULL END AS email`;
+    const result = await query(`SELECT ${fields} FROM users ORDER BY name`, canViewContactData ? [] : [req.user?.id]);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -25,7 +26,7 @@ export const getUserById = async (req: Request, res: Response) => {
     const { id } = req.params;
     const canViewContactData = req.user?.id === id || ['admin', 'manager'].includes(req.user?.role);
     const fields = canViewContactData
-      ? 'id, name, role, area_id, cpf, phone, avatar_url, created_at, available_hours, pode_publicar'
+      ? 'id, name, role, area_id, cpf, phone, email, avatar_url, created_at, available_hours, pode_publicar'
       : 'id, name, role, area_id, avatar_url, created_at, available_hours, pode_publicar';
     const result = await query(`SELECT ${fields} FROM users WHERE id = $1`, [id]);
     
@@ -44,7 +45,7 @@ export const getUserById = async (req: Request, res: Response) => {
 export const createUser = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { id, name, role, areaId, avatarUrl, available_hours, pode_publicar } = req.body;
+    const { id, name, role, areaId, avatarUrl, available_hours, pode_publicar, email } = req.body;
 
     if (!id || !name?.trim() || !['admin', 'manager', 'member'].includes(role) || !areaId) {
       return res.status(400).json({ error: 'Dados de usuário inválidos.' });
@@ -64,10 +65,10 @@ export const createUser = async (req: Request, res: Response) => {
     const finalPodePublicar = user.role === 'admin' ? Boolean(pode_publicar) : false;
     
     const result = await query(
-      `INSERT INTO users (id, name, role, area_id, avatar_url, available_hours, pode_publicar)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, role, area_id, avatar_url, available_hours, pode_publicar, created_at`,
-      [id, name, role, areaId, avatarUrl, available_hours || 160, finalPodePublicar]
+      `INSERT INTO users (id, name, role, area_id, avatar_url, available_hours, pode_publicar, email)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, name, role, area_id, avatar_url, available_hours, pode_publicar, email, created_at`,
+      [id, name, role, areaId, avatarUrl, available_hours || 160, finalPodePublicar, email?.trim().toLowerCase() || null]
     );
     
     res.status(201).json(result.rows[0]);
@@ -82,7 +83,7 @@ export const updateUser = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const { id } = req.params;
-    const { name, role, areaId, avatarUrl, available_hours, cpf, phone, password, pode_publicar } = req.body;
+    const { name, role, areaId, avatarUrl, available_hours, cpf, phone, email, password, pode_publicar } = req.body;
 
     if (password && password.length < 12) {
       return res.status(400).json({ error: 'A senha deve ter pelo menos 12 caracteres.' });
@@ -152,17 +153,24 @@ export const updateUser = async (req: Request, res: Response) => {
       finalPasswordHash = await bcrypt.hash(password, 12);
     }
 
-    const finalCpf = cpf !== undefined ? (cpf?.trim() || null) : (dbUser ? dbUser.cpf : null);
-    const finalPhone = phone !== undefined ? (phone?.trim() || null) : (dbUser ? dbUser.phone : null);
+    const finalCpf = cpf !== undefined ? (cpf?.replace(/\D/g, '') || null) : (dbUser ? dbUser.cpf : null);
+    const finalPhone = phone !== undefined ? (phone?.replace(/\D/g, '') || null) : (dbUser ? dbUser.phone : null);
+    if (finalCpf && finalCpf.length !== 11) {
+      return res.status(400).json({ error: 'O CPF deve conter exatamente 11 dígitos.' });
+    }
+    const finalEmail = email !== undefined ? (email?.trim().toLowerCase() || null) : (dbUser ? dbUser.email : null);
+    if (finalEmail && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail) || finalEmail.length > 320)) {
+      return res.status(400).json({ error: 'Informe um e-mail válido.' });
+    }
 
     // Use UPSERT: Insert if not exists, update if exists
     const result = await query(
-      `INSERT INTO users (id, name, role, area_id, avatar_url, available_hours, cpf, phone, password_hash, pode_publicar) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO users (id, name, role, area_id, avatar_url, available_hours, cpf, phone, email, password_hash, pode_publicar)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (id) 
        DO UPDATE SET name = $2, role = $3, area_id = $4, avatar_url = $5, available_hours = $6, 
-                     cpf = $7, phone = $8, password_hash = COALESCE($9, users.password_hash),
-                     pode_publicar = $10,
+                     cpf = $7, phone = $8, email = $9, password_hash = COALESCE($10, users.password_hash),
+                     pode_publicar = $11,
                      token_version = users.token_version + 1
        RETURNING *`,
       [
@@ -173,7 +181,8 @@ export const updateUser = async (req: Request, res: Response) => {
         avatarUrl, 
         finalAvailableHours !== undefined ? (finalAvailableHours || 160) : 160, 
         finalCpf, 
-        finalPhone, 
+        finalPhone,
+        finalEmail,
         finalPasswordHash,
         finalPodePublicar
       ]
@@ -191,13 +200,14 @@ export const updateUser = async (req: Request, res: Response) => {
       avatarUrl: userWithoutPassword.avatar_url,
       cpf: userWithoutPassword.cpf,
       phone: userWithoutPassword.phone,
+      email: userWithoutPassword.email,
       available_hours: userWithoutPassword.available_hours ? Number(userWithoutPassword.available_hours) : undefined,
       pode_publicar: userWithoutPassword.pode_publicar
     });
   } catch (error: any) {
     console.error('Error updating user:', error);
     if (error.code === '23505') { // Código de erro do PostgreSQL para violação de UNIQUE constraint
-      return res.status(400).json({ error: 'O CPF fornecido já está cadastrado em outro usuário.' });
+      return res.status(400).json({ error: 'O CPF ou e-mail informado já está cadastrado em outro usuário.' });
     }
     res.status(500).json({ error: 'Failed to update user' });
   }

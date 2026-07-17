@@ -1,7 +1,7 @@
 import React, { useState, useLayoutEffect } from 'react';
 import { Project } from '../services/projects';
 import { User, Area, Client, ProjectPhase } from '../types';
-import { X, Briefcase, Calendar, Users, AlignLeft, Plus, Trash2, ChevronUp, ChevronDown, MapPin, Building } from 'lucide-react';
+import { X, Briefcase, Calendar, Users, AlignLeft, Plus, Trash2, ChevronUp, ChevronDown, MapPin, Building, Target } from 'lucide-react';
 import { SearchableSelect } from './SearchableSelect';
 import { MultiSelect } from './MultiSelect';
 import { RichTextEditor } from './RichTextEditor';
@@ -67,6 +67,9 @@ const buildProjectFormData = (
       parent_id: project.parent_id || '',
       depends_on_id: project.depends_on_id || '',
       selected_phases: selectedPhases,
+      kpi_ids: Array.isArray(project.kpi_ids)
+        ? project.kpi_ids
+        : (project.kpis || []).map(kpi => kpi.id),
       private: Boolean(project.private),
       other_members: project.shared_with ? project.shared_with.map(m => typeof m === 'string' ? m : m.user_id) : []
     };
@@ -88,6 +91,7 @@ const buildProjectFormData = (
       parent_id: '',
       depends_on_id: '',
       selected_phases: [],
+      kpi_ids: [],
       private: false,
       other_members: []
     };
@@ -110,6 +114,7 @@ const buildProjectFormData = (
     selected_phases: projectPhases.length > 0
       ? Array.from(new Set([...projectPhases.map(p => p.name), 'Sem fase específica']))
       : ['Backlog', 'Planejamento', 'Execução', 'Sem fase específica'],
+    kpi_ids: [],
     private: false,
     other_members: []
   };
@@ -127,7 +132,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   currentUser,
   projects = [],
   projectPhases = [],
-  onArchive
+  onArchive,
+  projectCategories = [],
+  projectStatuses = [],
+  projectKpis = []
 }) => {
   const mode = explicitMode || (project ? 'edit' : 'create');
   const [newPhase, setNewPhase] = useState('');
@@ -215,11 +223,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     onChange={e => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700 dark:text-gray-300"
                   >
-                    <option value="Sustentação">Sustentação</option>
-                    <option value="Estratégico">Estratégico</option>
-                    <option value="Inovação">Inovação</option>
-                    <option value="RPA">RPA</option>
-                    <option value="Processos">Melhoria de Processos</option>
+                    {(projectCategories.length > 0
+                      ? projectCategories
+                      : [
+                          { id: 'sustentacao', name: 'Sustentação', position: 1 },
+                          { id: 'estrategico', name: 'Estratégico', position: 2 },
+                          { id: 'inovacao', name: 'Inovação', position: 3 },
+                          { id: 'rpa', name: 'RPA', position: 4 },
+                          { id: 'processos', name: 'Melhoria de Processos', position: 5 }
+                        ]
+                    ).map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -229,15 +242,36 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     onChange={e => setFormData({ ...formData, status: e.target.value })}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700 dark:text-gray-300"
                   >
-                    <option value="Ativo">Ativo</option>
-                    <option value="Impedido">Impedido</option>
-                    <option value="Atrasado">Atrasado</option>
-                    <option value="Pausado">Pausado</option>
-                    <option value="Concluído">Concluído</option>
-                    <option value="Não iniciado/Backlog">Não iniciado/Backlog</option>
-                    <option value="Cancelado">Cancelado</option>
+                    {(projectStatuses.length > 0
+                      ? projectStatuses
+                      : [
+                          { id: 'ativo', name: 'Ativo', color: '#374A67', position: 1 },
+                          { id: 'impedido', name: 'Impedido', color: '#ef4444', position: 2 },
+                          { id: 'atrasado', name: 'Atrasado', color: '#f97316', position: 3 },
+                          { id: 'pausado', name: 'Pausado', color: '#6b7280', position: 4 },
+                          { id: 'concluido', name: 'Concluído', color: '#0E1116', position: 5 },
+                          { id: 'backlog', name: 'Não iniciado/Backlog', color: '#64748b', position: 6 },
+                          { id: 'cancelado', name: 'Cancelado', color: '#991b1b', position: 7 }
+                        ]
+                    ).map(status => <option key={status.id} value={status.name}>{status.name}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
+                  <Target className="w-4 h-4 text-[#374A67]" /> KPIs relacionados
+                </label>
+                <MultiSelect
+                  label="KPIs"
+                  emptyLabel="Nenhum KPI"
+                  options={projectKpis.map(kpi => ({ label: kpi.name, value: kpi.id }))}
+                  selectedValues={formData.kpi_ids || []}
+                  onChange={kpiIds => setFormData({ ...formData, kpi_ids: kpiIds })}
+                />
+                <p className="mt-1.5 text-[10px] text-gray-400 font-medium">
+                  Selecione um ou mais indicadores aos quais este projeto contribui.
+                </p>
               </div>
 
               {(currentUser.role === 'admin' || currentUser.role === 'manager') && (

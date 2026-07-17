@@ -2,7 +2,7 @@
 
 Este arquivo é um roteiro operacional para assistentes de IA, agentes de código e ferramentas de automação. Se você é uma pessoa sem experiência técnica, envie este arquivo ao assistente e diga:
 
-> Leia `Intall_By_Robo.md` integralmente, identifique meu tipo de instalação e conduza o processo até todos os testes finais passarem. Não exponha senhas nem apague dados existentes.
+> Leia `INSTALL_BY_ROBO.md` integralmente, identifique meu tipo de instalação e conduza o processo até todos os testes finais passarem. Não exponha senhas nem apague dados existentes.
 
 O assistente deve ler também o [`README.md`](README.md), o [`.env.example`](.env.example), o [`backend/.env.example`](backend/.env.example) e o [`SECURITY.md`](SECURITY.md) da mesma versão do repositório antes de executar qualquer alteração.
 
@@ -11,7 +11,7 @@ O assistente deve ler também o [`README.md`](README.md), o [`.env.example`](.en
 Entregar uma destas instalações funcionando:
 
 1. **Local com Docker:** aplicação completa na máquina do usuário;
-2. **Demonstração local:** aplicação completa com três usuários previsíveis para avaliação;
+2. **Demonstração local:** aplicação completa com três usuários previsíveis e dados fictícios em todos os módulos;
 3. **VPS:** aplicação completa em servidor, com domínio, HTTPS, banco e uploads persistentes;
 4. **Vercel + Supabase:** frontend na Vercel, PostgreSQL no Supabase e backend em um serviço Node persistente.
 
@@ -20,10 +20,12 @@ O trabalho só está concluído quando a URL abre, `/health` responde, o login a
 ## Regras obrigatórias para o agente
 
 - Nunca imprimir, enviar ao chat, versionar ou incluir em PR valores de `.env`, senhas, tokens, chaves ou strings de conexão.
+- Ao verificar um `.env`, mostrar somente se cada variável está configurada e se o formato é válido. Nunca usar comandos que imprimam a linha completa de uma variável secreta.
 - Nunca sobrescrever um `.env` existente. Primeiro verificar quais variáveis faltam e preservar os valores atuais.
 - Nunca executar `docker compose down -v`, apagar volumes, recriar banco, alterar DNS, firewall ou proxy de uma instalação existente sem confirmação expressa.
 - Nunca habilitar `DEMO_USERS_ENABLED=true` em ambiente público. O backend deve recusar essa configuração quando `NODE_ENV=production`.
 - Nunca usar as credenciais de demonstração como credenciais reais.
+- Não declarar a recuperação de senha como ativa antes de configurar e testar SMTP, TLS e o e-mail de cada usuário.
 - Não usar uma chave Supabase `service_role`, `anon`, senha do banco ou `DATABASE_URL` em variável com prefixo `VITE_`.
 - Não expor PostgreSQL ou a porta `3001` da API diretamente à internet.
 - Em uma atualização, fazer backup verificável do PostgreSQL e do volume de uploads antes de recriar serviços.
@@ -120,6 +122,132 @@ O login administrativo deve conter somente dígitos porque a interface aceita CP
 
 Não trocar `MFA_ENCRYPTION_KEY` em uma instalação com MFA ativo sem planejar o recadastro dos autenticadores.
 
+## Recuperação de senha e SMTP
+
+Este recurso é opcional, mas deve ser configurado antes de declarar a instalação pronta quando o usuário solicitar recuperação de senha. Ele exige SMTP no backend e um e-mail único cadastrado no perfil de cada usuário.
+
+### SMTP genérico
+
+Obter do usuário ou do provedor os seguintes valores, pedindo que os segredos sejam inseridos diretamente no `.env` ou no painel privado do host:
+
+```dotenv
+SMTP_HOST=<servidor SMTP>
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_REQUIRE_TLS=true
+SMTP_USER=<conta autenticada>
+SMTP_PASSWORD=<segredo inserido diretamente pelo usuário>
+SMTP_FROM="NUVYO <remetente-autorizado@seudominio.com>"
+```
+
+Para STARTTLS na porta 587, usar `SMTP_SECURE=false` e `SMTP_REQUIRE_TLS=true`. Para TLS direto na porta 465, usar `SMTP_SECURE=true`. Manter a validação do certificado TLS; não sugerir `rejectUnauthorized=false`.
+
+### Gmail para testes
+
+Uma conta Gmail comum pode ser usada para testes. O agente deve orientar o usuário a:
+
+1. ativar a verificação em duas etapas na conta Google;
+2. abrir [Senhas de app do Google](https://support.google.com/accounts/answer/185833?hl=pt-BR);
+3. criar uma senha de app chamada `NUVYO`;
+4. inserir os 16 caracteres diretamente no `.env`, sem espaços;
+5. nunca fornecer ao agente a senha normal da conta Google.
+
+Configuração esperada:
+
+```dotenv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_REQUIRE_TLS=true
+SMTP_USER=seuemail@gmail.com
+SMTP_PASSWORD=<senha-de-app-sem-espacos>
+SMTP_FROM="NUVYO <seuemail@gmail.com>"
+```
+
+No Gmail, usar o mesmo endereço em `SMTP_USER` e `SMTP_FROM`. Se uma senha de app aparecer em terminal compartilhado, log, chat ou ferramenta de diagnóstico, interromper o teste, removê-la do ambiente, pedir ao usuário que a revogue no Google e continuar somente com uma nova senha.
+
+### Aplicar e validar
+
+Em Docker Compose:
+
+```bash
+chmod 600 .env
+docker compose up -d --force-recreate backend
+curl -fsS http://localhost:8088/api/auth/recover/config
+```
+
+Em produção, substituir a URL local pela URL pública. O resultado esperado é:
+
+```json
+{"enabled":true}
+```
+
+Depois:
+
+1. confirmar pela interface administrativa que o usuário de teste possui um e-mail único e correto;
+2. abrir **Esqueci minha senha** na tela de login;
+3. usar o CPF ou telefone do próprio usuário de teste;
+4. pedir que o usuário confira caixa de entrada e spam e digite o código diretamente no navegador;
+5. confirmar que a nova senha possui pelo menos 12 caracteres e é diferente do login;
+6. validar que a senha antiga e as sessões anteriores deixaram de funcionar.
+
+O agente não deve pedir que o usuário envie o código de recuperação pelo chat. Um `202` na solicitação é deliberadamente neutro e não comprova entrega. A validação só termina após o backend não registrar erro SMTP e o usuário confirmar o recebimento. Para produção, recomendar remetente exclusivo ou provedor transacional, além de SPF, DKIM e DMARC.
+
+## Relatórios com Inteligência Artificial
+
+O módulo é opcional e suporta Google Gemini, OpenAI e Anthropic Claude. A configuração recomendada é feita pelo frontend depois do primeiro login administrativo. A chave é enviada diretamente ao backend, validada no provedor e armazenada cifrada no PostgreSQL; ela não deve ser adicionada a variáveis `VITE_*` nem enviada ao chat.
+
+### Pré-requisitos
+
+- `MFA_ENCRYPTION_KEY` válida, estável e protegida;
+- saída HTTPS do backend para o provedor escolhido;
+- chave de API com permissão para consultar e usar modelos;
+- aprovação do responsável sobre custos, retenção, região e envio dos dados ao provedor.
+
+O agente deve explicar que projetos, tarefas e diários autorizados no escopo do relatório serão transmitidos ao provedor selecionado. Não habilitar o recurso com dados reais sem essa ciência.
+
+### Configuração assistida
+
+1. autenticar como superadmin;
+2. abrir **Configurações → Configurar Inteligência Artificial**;
+3. pedir que o usuário cole a chave diretamente no campo da interface, sem mostrá-la ao agente;
+4. selecionar Google Gemini, OpenAI ou Anthropic Claude;
+5. clicar em **Carregar modelos disponíveis**;
+6. escolher um modelo de texto disponível para aquela chave;
+7. salvar a configuração;
+8. fechar e abrir novamente a tela, confirmando apenas que existe uma chave armazenada, nunca seu conteúdo.
+
+### Templates e Gestor de Projetos Sênior
+
+Depois de configurar o provedor, o agente deve abrir **Configurações → Templates de Relatórios IA** e confirmar:
+
+1. existência do template destacado **Gestor de Projetos Sênior**;
+2. possibilidade de criar, duplicar, editar e excluir um template;
+3. possibilidade de adicionar, remover e reordenar até 12 seções;
+4. seleção das variáveis específicas de cada seção;
+5. restauração dos templates padrão sem excluir os templates personalizados.
+
+O editor não controla as regras globais de segurança. Escopo, autorização, proteção contra instruções contidas nos dados e sanitização do HTML permanecem no backend. Somente o superadmin pode alterar templates. A exclusão preserva o histórico de relatórios.
+
+A aplicação consulta os endpoints oficiais de modelos do [Gemini](https://ai.google.dev/api/models), da [OpenAI](https://developers.openai.com/api/reference/resources/models/methods/list) e da [Anthropic](https://platform.claude.com/docs/en/api/models/list). Não manter uma lista manual de modelos no `.env` nem assumir que uma chave possui acesso a todos os modelos do provedor.
+
+`GEMINI_API_KEY` no ambiente funciona somente como compatibilidade legada. Quando presente e ainda não existir configuração no banco, ativa Gemini com o modelo legado. Para instalações novas, preferir o frontend. Nunca mover essa chave para `VITE_GEMINI_API_KEY`.
+
+### Teste funcional
+
+1. abrir **Gerar Relatório com IA** como administrador ou gestor;
+2. escolher um período curto e o template **Gestor de Projetos Sênior**;
+3. testar os escopos permitidos: empresa/estrutura, área, cliente e colaborador;
+4. escrever uma pergunta adicional sem inserir dados secretos;
+5. confirmar que o resultado aparece como HTML formatado;
+6. abrir **Histórico de Relatórios IA** e localizar o item;
+7. usar **Exportar PDF** e confirmar a visualização de impressão em A4;
+8. confirmar que um colaborador comum recebe HTTP 403 nas rotas de IA;
+9. confirmar que um gestor não consegue configurar o provedor nem gerar relatórios fora de sua área.
+10. confirmar que um gestor recebe HTTP 403 ao tentar criar, editar, excluir ou restaurar templates;
+
+O agente não deve considerar um HTTP 200 isolado como validação suficiente: deve confirmar a aparência do relatório, o histórico, o escopo e a exportação. Se a chave for exposta em terminal, log ou chat, interromper, removê-la da configuração e orientar sua revogação no provedor.
+
 ---
 
 # Caminho A — Instalação local com Docker
@@ -170,7 +298,7 @@ Resultado esperado de saúde:
 {"status":"ok","message":"NUVYO API is running"}
 ```
 
-Abrir `http://localhost:8088`, autenticar com `BOOTSTRAP_ADMIN_LOGIN` e `BOOTSTRAP_ADMIN_PASSWORD` e confirmar que o Painel Geral carrega sem erros 404/500.
+Abrir `http://localhost:8088` para validar a landing page e `http://localhost:8088/app` para autenticar com `BOOTSTRAP_ADMIN_LOGIN` e `BOOTSTRAP_ADMIN_PASSWORD`. Confirmar que o Painel Geral carrega sem erros 404/500.
 
 ## A4. Após o primeiro login
 
@@ -202,7 +330,7 @@ docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml up
 | Gestor | `88888888899` | `88888888899` |
 | Colaborador | `88888888800` | `88888888800` |
 
-Validar os três perfis em `http://localhost:8088`.
+Validar os três perfis em `http://localhost:8088/app`.
 
 ## B3. Encerrar e apagar somente a demonstração
 
@@ -213,6 +341,16 @@ docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml do
 ```
 
 O uso de `-p nuvyo-demo` separa os volumes demo dos volumes da instalação padrão.
+
+## B4. Conteúdo esperado da demonstração
+
+Confirmar que a carga criou áreas, clientes, seis projetos, dezoito tarefas, chamados, diário de bordo, comentários, notificações, gamificação, campanhas, resumo gerencial e sugestões. A carga está em `backend/src/migrations/seed_demo.sql`, usa apenas IDs com prefixo `demo-` e pode ser executada novamente para restaurar os dados e recalcular as datas relativas:
+
+```bash
+docker compose -p nuvyo-demo -f docker-compose.yml -f docker-compose.demo.yml \
+  exec -T postgres psql -U postgres -d central_atividades -v ON_ERROR_STOP=1 \
+  < backend/src/migrations/seed_demo.sql
+```
 
 ---
 
@@ -590,4 +728,6 @@ Checklist final:
 - [ ] bootstrap foi removido depois do primeiro administrador;
 - [ ] backups foram configurados e testados;
 - [ ] MFA e política de segurança foram apresentados ao administrador;
+- [ ] SMTP foi testado, o código chegou e os usuários possuem e-mails únicos, quando a recuperação estiver habilitada;
+- [ ] IA foi configurada sem expor a chave, escopos foram validados e histórico/PDF funcionam, quando o módulo estiver habilitado;
 - [ ] nenhum segredo apareceu no Git, CI, logs compartilhados ou resposta final.

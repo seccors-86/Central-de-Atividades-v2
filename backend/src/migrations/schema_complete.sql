@@ -85,10 +85,41 @@ CREATE TABLE public.activity_logs (
 CREATE TABLE public.ai_summaries (
     id character varying(50) NOT NULL,
     date date NOT NULL,
+    title character varying(200) DEFAULT 'Resumo com IA'::character varying NOT NULL,
     content text NOT NULL,
     period_start date NOT NULL,
     period_end date NOT NULL,
+    template_id character varying(60) DEFAULT 'legacy'::character varying NOT NULL,
+    question text,
+    format character varying(20) DEFAULT 'markdown'::character varying NOT NULL,
+    scope_type character varying(20) DEFAULT 'all'::character varying NOT NULL,
+    scope_id character varying(50),
+    scope_label character varying(255) DEFAULT 'Toda a empresa'::character varying NOT NULL,
+    provider character varying(30) DEFAULT 'legacy'::character varying NOT NULL,
+    model character varying(200),
+    created_by character varying(50),
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+--
+-- Name: ai_report_templates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_report_templates (
+    id character varying(60) NOT NULL,
+    name character varying(120) NOT NULL,
+    description character varying(500) DEFAULT ''::character varying NOT NULL,
+    sections jsonb DEFAULT '[]'::jsonb NOT NULL,
+    required_scope character varying(20) DEFAULT 'any'::character varying NOT NULL,
+    featured boolean DEFAULT false NOT NULL,
+    is_builtin boolean DEFAULT false NOT NULL,
+    created_by character varying(50),
+    updated_by character varying(50),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    deleted_at timestamp without time zone,
+    CONSTRAINT ai_report_templates_required_scope_check CHECK (((required_scope)::text = ANY (ARRAY['any'::text, 'client'::text])))
 );
 
 
@@ -482,6 +513,9 @@ ALTER TABLE ONLY public.activity_logs
 ALTER TABLE ONLY public.ai_summaries
     ADD CONSTRAINT ai_summaries_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.ai_report_templates
+    ADD CONSTRAINT ai_report_templates_pkey PRIMARY KEY (id);
+
 
 --
 -- Name: areas areas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -655,6 +689,12 @@ ALTER TABLE ONLY public.users
 -- Name: idx_activity_logs_date; Type: INDEX; Schema: public; Owner: -
 --
 
+CREATE INDEX idx_ai_report_templates_active ON public.ai_report_templates USING btree (featured DESC, name) WHERE (deleted_at IS NULL);
+
+CREATE INDEX idx_ai_summaries_created_at ON public.ai_summaries USING btree (created_at DESC);
+
+CREATE INDEX idx_ai_summaries_created_by ON public.ai_summaries USING btree (created_by, created_at DESC);
+
 CREATE INDEX idx_activity_logs_date ON public.activity_logs USING btree (date);
 
 
@@ -783,6 +823,27 @@ CREATE INDEX idx_users_area ON public.users USING btree (area_id);
 
 CREATE TRIGGER trg_create_user_gamification_profile AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION public.create_user_gamification_profile();
 
+
+--
+-- Name: ai_report_templates ai_report_templates_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_report_templates
+    ADD CONSTRAINT ai_report_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+--
+-- Name: ai_report_templates ai_report_templates_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_report_templates
+    ADD CONSTRAINT ai_report_templates_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+--
+-- Name: ai_summaries ai_summaries_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_summaries
+    ADD CONSTRAINT ai_summaries_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 --
 -- Name: activity_log_tags activity_log_tags_activity_log_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

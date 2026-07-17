@@ -364,7 +364,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
           </button>
           <div>
              <h2 className="text-lg font-black text-gray-900 dark:text-gray-300 tracking-tight">{project.name}</h2>
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{project.category || 'Geral'}</p>
+             <div className="flex flex-wrap items-center gap-1.5 mt-1">
+               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{project.category || 'Geral'}</span>
+               {(project.kpis || []).map(kpi => (
+                 <span key={kpi.id} className="px-2 py-0.5 rounded-full bg-[#E6FAFC] text-[#374A67] text-[9px] font-black uppercase tracking-wider">
+                   {kpi.name}
+                 </span>
+               ))}
+             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">

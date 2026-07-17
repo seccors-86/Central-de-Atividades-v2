@@ -89,7 +89,10 @@ const getPlainProjectDescription = (description?: string | null) => {
     .trim();
 };
 
-export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ currentUser, users, areas, tags, clients, isManager, buckets = [], projectPhases = [] }) => {
+export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
+  currentUser, users, areas, tags, clients, isManager, buckets = [], projectPhases = [],
+  projectCategories = [], projectStatuses = [], projectKpis = []
+}) => {
   const defaultAreaFilter = useMemo(() => [], []);
   const currentAreaName = useMemo(
     () => areas.find(area => area.id === currentUser.areaId)?.name || '',
@@ -464,6 +467,9 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ currentUser, use
           currentUser={currentUser}
           projects={projects}
           projectPhases={projectPhases}
+          projectCategories={projectCategories}
+          projectStatuses={projectStatuses}
+          projectKpis={projectKpis}
           onArchive={(id) => {
             setProjectToDelete(id);
           }}
@@ -1047,6 +1053,9 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ currentUser, use
         currentUser={currentUser}
         projects={projects}
         projectPhases={projectPhases}
+        projectCategories={projectCategories}
+        projectStatuses={projectStatuses}
+        projectKpis={projectKpis}
         onArchive={(id) => {
           setProjectToDelete(id);
           setIsModalOpen(false);

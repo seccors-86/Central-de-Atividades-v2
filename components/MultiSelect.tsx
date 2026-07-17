@@ -7,9 +7,10 @@ interface MultiSelectProps {
   selectedValues: string[];
   onChange: (values: string[]) => void;
   className?: string;
+  emptyLabel?: string;
 }
 
-export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, selectedValues, onChange, className = '' }) => {
+export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, selectedValues, onChange, className = '', emptyLabel = 'Todos' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, select
   };
 
   const displayText = selectedValues.length === 0
-    ? `${label}: Todos`
+    ? `${label}: ${emptyLabel}`
     : selectedValues.length === 1
     ? `${label}: ${options.find(o => o.value === selectedValues[0])?.label}`
     : `${label}: ${selectedValues.length} selecionados`;
@@ -83,7 +84,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, select
               <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${selectedValues.length === 0 ? 'bg-[#374A67] border-[#374A67]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'}`}>
                 {selectedValues.length === 0 && <Check size={10} className="text-white" />}
               </div>
-              Todos
+              {emptyLabel}
             </div>
             {options.filter(o => !search.trim() || o.label.toLowerCase().includes(search.toLowerCase())).map(opt => {
               const isSelected = selectedValues.includes(opt.value);

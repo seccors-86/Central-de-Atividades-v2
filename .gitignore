@@ -67,3 +67,11 @@ _arquivos_avulsos/
 *.orig
 *.rej
 patch_*.py
+
+# Landing page institucional usada apenas na implantação oficial
+# Mantida fora do repositório público; o build local da VPS continua usando estes arquivos.
+/components/LandingPage.tsx
+/landing.css
+/public/landing/
+/public/robots.txt
+/public/sitemap.xml

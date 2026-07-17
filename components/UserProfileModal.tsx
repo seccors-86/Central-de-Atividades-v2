@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Area } from '../types';
-import { X, Camera, Eye, EyeOff, Lock, Phone, CreditCard, User as UserIcon, Loader2, Save } from 'lucide-react';
+import { X, Camera, Eye, EyeOff, Lock, Phone, CreditCard, User as UserIcon, Loader2, Save, Mail } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
 
 interface UserProfileModalProps {
@@ -21,6 +21,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [name, setName] = useState(currentUser.name);
   const [cpf, setCpf] = useState(currentUser.cpf || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
+  const [email, setEmail] = useState(currentUser.email || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || '');
 
   const [password, setPassword] = useState('');
@@ -40,6 +41,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setName(currentUser.name);
       setCpf(currentUser.cpf || '');
       setPhone(currentUser.phone || '');
+      setEmail(currentUser.email || '');
       setAvatarUrl(currentUser.avatarUrl || '');
       setPassword('');
       setConfirmPassword('');
@@ -108,6 +110,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setErrorMsg('O CPF deve conter exatamente 11 dígitos.');
       return;
     }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErrorMsg('Informe um e-mail válido para recuperação de senha.');
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -120,6 +126,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         avatarUrl,
         cpf: cpf.trim() || undefined,
         phone: phone.trim() || undefined,
+        email: email.trim().toLowerCase() || undefined,
       };
 
       if (password) {
@@ -295,6 +302,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                  E-mail para recuperação de senha
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-3 text-gray-400"><Mail className="w-4 h-4" /></span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="voce@empresa.com.br"
+                    maxLength={320}
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-gray-800 dark:text-gray-150 focus:border-[#374A67] dark:focus:border-[#374A67] outline-none transition-all font-semibold"
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-gray-400">Usado somente para segurança da conta e recuperação de acesso.</p>
               </div>
 
               {/* Password change group */}

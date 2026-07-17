@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { authService } from "../services/auth";
 import { mfaService } from '../services/mfa';
-import { Loader2, LogIn, KeyRound, Phone, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Loader2, LogIn, KeyRound, Phone, AlertCircle, CheckCircle2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 interface LoginProps {
   onLoginSuccess: () => void;
@@ -24,6 +24,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isRecovering, setIsRecovering] = useState(false);
   const [recoverySuccess, setRecoverySuccess] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryStep, setRecoveryStep] = useState<'request' | 'reset'>('request');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryPasswordConfirm, setRecoveryPasswordConfirm] = useState('');
+  const [recoveryComplete, setRecoveryComplete] = useState(false);
+  const [recoveryEnabled, setRecoveryEnabled] = useState<boolean | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +77,38 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const handleRecover = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRecoveryError('Por segurança, a recuperação automática está desativada. Contate um administrador do NUVYO.');
+    setRecoveryError(null);
+    setRecoverySuccess(null);
+    const cleanLogin = recoveryField.replace(/\D/g, '');
+    if (!/^\d{11,20}$/.test(cleanLogin)) {
+      setRecoveryError('Informe seu CPF ou telefone somente com números.');
+      return;
+    }
+    if (recoveryEnabled !== true) {
+      setRecoveryError('O envio de e-mail ainda não foi configurado. Contate um administrador do NUVYO.');
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      if (recoveryStep === 'request') {
+        const result = await authService.recover(cleanLogin);
+        setRecoverySuccess(result.message || 'Se houver um e-mail cadastrado, o código será enviado.');
+        setRecoveryStep('reset');
+      } else {
+        if (!/^\d{6}$/.test(recoveryCode)) throw new Error('Digite o código de 6 dígitos recebido por e-mail.');
+        if (recoveryPassword.length < 12) throw new Error('A nova senha deve ter pelo menos 12 caracteres.');
+        if (recoveryPassword !== recoveryPasswordConfirm) throw new Error('A confirmação da nova senha não coincide.');
+        const result = await authService.resetRecoveredPassword(cleanLogin, recoveryCode, recoveryPassword);
+        setRecoverySuccess(result.message);
+        setRecoveryComplete(true);
+        setPassword('');
+      }
+    } catch (err: any) {
+      setRecoveryError(err.message || 'Não foi possível concluir a recuperação.');
+    } finally {
+      setIsRecovering(false);
+    }
   };
 
   return (
@@ -200,6 +237,16 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   setRecoverySuccess(null);
                   setRecoveryError(null);
                   setRecoveryField("");
+                  setRecoveryStep('request');
+                  setRecoveryCode('');
+                  setRecoveryPassword('');
+                  setRecoveryPasswordConfirm('');
+                  setRecoveryComplete(false);
+                  setRecoveryEnabled(null);
+                  void authService.getRecoveryConfig().then(config => {
+                    setRecoveryEnabled(config.enabled);
+                    if (!config.enabled) setRecoveryError('O envio de e-mail ainda não foi configurado. Contate um administrador do NUVYO.');
+                  });
                 }}
                 className="text-sm text-[#0E1116] hover:text-[#374A67] font-semibold transition-colors underline-offset-2 hover:underline"
               >
@@ -223,7 +270,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="p-6">
               <h3 className="text-lg font-bold text-[#1f2937] mb-1">Recuperar Senha</h3>
               <p className="text-sm text-gray-500 mb-5">
-                Por segurança, senhas e MFA não são redefinidos automaticamente por CPF ou telefone. Contate um administrador do NUVYO.
+                {recoveryStep === 'request'
+                  ? 'Informe seu CPF ou telefone. Enviaremos um código de uso único para o e-mail cadastrado.'
+                  : 'Digite o código recebido e escolha uma nova senha. O código expira em 10 minutos.'}
               </p>
 
               <form onSubmit={handleRecover} className="space-y-3">
@@ -235,8 +284,48 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     onChange={(e) => setRecoveryField(e.target.value)}
                     placeholder="CPF ou Telefone"
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#374A67]/30 focus:border-[#374A67] transition-all bg-[#f9fafb] placeholder-gray-400"
+                    disabled={recoveryStep === 'reset' || recoveryComplete}
                   />
                 </div>
+
+                {recoveryStep === 'reset' && !recoveryComplete && (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={recoveryCode}
+                        onChange={e => setRecoveryCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Código de 6 dígitos"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm tracking-[0.25em] focus:outline-none focus:ring-2 focus:ring-[#374A67]/30"
+                      />
+                    </div>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={recoveryPassword}
+                        onChange={e => setRecoveryPassword(e.target.value)}
+                        placeholder="Nova senha (mínimo 12 caracteres)"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#374A67]/30"
+                      />
+                    </div>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={recoveryPasswordConfirm}
+                        onChange={e => setRecoveryPasswordConfirm(e.target.value)}
+                        placeholder="Confirme a nova senha"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#374A67]/30"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {recoveryError && (
                   <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
@@ -255,20 +344,39 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <div className="flex gap-3 pt-1">
                   <button
                     type="button"
-                    onClick={() => setIsRecoveryOpen(false)}
+                    onClick={() => {
+                      if (recoveryComplete) setLoginField(recoveryField.replace(/\D/g, ''));
+                      setIsRecoveryOpen(false);
+                    }}
                     className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
                   >
-                    Cancelar
+                    {recoveryComplete ? 'Voltar ao login' : 'Cancelar'}
                   </button>
-                  <button
+                  {!recoveryComplete && <button
                     type="submit"
-                    disabled={isRecovering || !!recoverySuccess}
+                    disabled={isRecovering || recoveryEnabled !== true}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#374A67] text-white rounded-xl text-sm font-bold hover:bg-[#2B3C57] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isRecovering ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {isRecovering ? "Redefinindo..." : "Redefinir Senha"}
-                  </button>
+                    {isRecovering
+                      ? (recoveryStep === 'request' ? 'Enviando...' : 'Alterando...')
+                      : (recoveryStep === 'request' ? 'Enviar código' : 'Alterar senha')}
+                  </button>}
                 </div>
+                {recoveryStep === 'reset' && !recoveryComplete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryStep('request');
+                      setRecoveryCode('');
+                      setRecoverySuccess(null);
+                      setRecoveryError(null);
+                    }}
+                    className="w-full text-xs text-gray-500 hover:text-[#374A67]"
+                  >
+                    Não recebi o código ou quero reenviar
+                  </button>
+                )}
               </form>
             </div>
           </div>

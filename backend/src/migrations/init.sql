@@ -5,6 +5,7 @@
 DROP TABLE IF EXISTS activity_log_tags CASCADE;
 DROP TABLE IF EXISTS task_tags CASCADE;
 DROP TABLE IF EXISTS task_members CASCADE;
+DROP TABLE IF EXISTS ai_report_templates CASCADE;
 DROP TABLE IF EXISTS ai_summaries CASCADE;
 DROP TABLE IF EXISTS activity_logs CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
@@ -115,11 +116,43 @@ CREATE TABLE activity_log_tags (
 CREATE TABLE ai_summaries (
     id VARCHAR(50) PRIMARY KEY,
     date DATE NOT NULL,
+    title VARCHAR(200) NOT NULL DEFAULT 'Resumo com IA',
     content TEXT NOT NULL,
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
+    template_id VARCHAR(60) NOT NULL DEFAULT 'legacy',
+    question TEXT,
+    format VARCHAR(20) NOT NULL DEFAULT 'markdown',
+    scope_type VARCHAR(20) NOT NULL DEFAULT 'all',
+    scope_id VARCHAR(50),
+    scope_label VARCHAR(255) NOT NULL DEFAULT 'Toda a empresa',
+    provider VARCHAR(30) NOT NULL DEFAULT 'legacy',
+    model VARCHAR(200),
+    created_by VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_ai_summaries_created_at ON ai_summaries(created_at DESC);
+CREATE INDEX idx_ai_summaries_created_by ON ai_summaries(created_by, created_at DESC);
+
+CREATE TABLE ai_report_templates (
+    id VARCHAR(60) PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    description VARCHAR(500) NOT NULL DEFAULT '',
+    sections JSONB NOT NULL DEFAULT '[]'::jsonb,
+    required_scope VARCHAR(20) NOT NULL DEFAULT 'any' CHECK (required_scope IN ('any', 'client')),
+    featured BOOLEAN NOT NULL DEFAULT false,
+    is_builtin BOOLEAN NOT NULL DEFAULT false,
+    created_by VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    updated_by VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX idx_ai_report_templates_active
+    ON ai_report_templates(featured DESC, name) WHERE deleted_at IS NULL;
 
 -- Create indexes for better query performance
 CREATE INDEX idx_users_area ON users(area_id);

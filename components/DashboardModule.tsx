@@ -109,12 +109,15 @@ export const DashboardModule: React.FC<DashboardProps> = ({ tasks, projects, use
   const projectsByKpi = useMemo(() => {
     const kpiProjects = projects.filter(project => !project.archived);
     const counts = kpiProjects.reduce((acc, project) => {
-      const key = project.kpi?.trim() || 'Sem KPI';
-      if (!acc[key]) acc[key] = { name: key, total: 0, active: 0, done: 0, backlog: 0 };
-      acc[key].total++;
-      if (project.progress === 100 || project.status === 'Concluído' || project.status === 'done') acc[key].done++;
-      else if ((project.progress || 0) > 0 || project.status === 'Ativo' || project.status === 'doing') acc[key].active++;
-      else acc[key].backlog++;
+      const linkedKpis = (project.kpis || []).map(kpi => kpi.name?.trim()).filter(Boolean) as string[];
+      const keys = linkedKpis.length > 0 ? linkedKpis : [project.kpi?.trim() || 'Sem KPI'];
+      keys.forEach(key => {
+        if (!acc[key]) acc[key] = { name: key, total: 0, active: 0, done: 0, backlog: 0 };
+        acc[key].total++;
+        if (project.progress === 100 || project.status === 'Concluído' || project.status === 'done') acc[key].done++;
+        else if ((project.progress || 0) > 0 || project.status === 'Ativo' || project.status === 'doing') acc[key].active++;
+        else acc[key].backlog++;
+      });
       return acc;
     }, {} as Record<string, { name: string; total: number; active: number; done: number; backlog: number }>);
 
@@ -137,9 +140,9 @@ export const DashboardModule: React.FC<DashboardProps> = ({ tasks, projects, use
     });
   }, [projects, projectKpis]);
 
-  const totalKpiProjects = useMemo(
-    () => projects.filter(project => !project.archived).length,
-    [projects]
+  const totalKpiAssignments = useMemo(
+    () => projectsByKpi.reduce((total, row) => total + row.total, 0),
+    [projectsByKpi]
   );
 
   const isSupport = (task: Task) => task.taskType === 'support';
@@ -828,7 +831,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({ tasks, projects, use
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {projectsByKpi.map((row, index) => {
-              const pct = totalKpiProjects > 0 ? Math.round((row.total / totalKpiProjects) * 100) : 0;
+              const pct = totalKpiAssignments > 0 ? Math.round((row.total / totalKpiAssignments) * 100) : 0;
               return (
                 <div key={row.name} className="p-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/50">
                   <div className="flex items-center justify-between gap-3 mb-3">

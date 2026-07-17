@@ -14,13 +14,12 @@ import {
   TimeLog,
 } from "./types";
 import * as storage from "./services/storage";
-import * as geminiService from "./services/geminiService";
+import { aiService } from "./services/ai";
 import { gamificationService } from "./services/gamification";
 import { authService } from "./services/auth";
 import { Login } from "./components/Login";
 import { ActivityInput } from "./components/ActivityInput";
 import { ActivityFeed } from "./components/ActivityFeed";
-import { SummaryModal } from "./components/SummaryModal";
 import { TagManagerModal } from "./components/TagManagerModal";
 import { StatusManagerModal } from "./components/StatusManagerModal";
 import { Dashboard } from "./components/Dashboard";
@@ -29,6 +28,9 @@ import { BucketManagerModal } from "./components/BucketManagerModal";
 import { PhaseManagerModal } from "./components/PhaseManagerModal";
 import { ClientManagerModal } from "./components/ClientManagerModal";
 import { AISummaryHistoryModal } from "./components/AISummaryHistoryModal";
+import { AIReportModal } from "./components/AIReportModal";
+import { AISettingsModal } from "./components/AISettingsModal";
+import { AIReportTemplateManagerModal } from "./components/AIReportTemplateManagerModal";
 import { GamificationWidget } from "./components/GamificationWidget";
 import { TaskBoard } from "./components/TaskBoard";
 import { Gamificacao } from "./components/Gamificacao";
@@ -56,6 +58,7 @@ import {
   Layout,
   LogOut,
   Sparkles,
+  Bot,
   Filter,
   Settings2,
   Users,
@@ -84,7 +87,8 @@ import {
   Square,
   Trophy,
   Lightbulb,
-  ShieldCheck
+  ShieldCheck,
+  LayoutTemplate
 } from "lucide-react";
 import {
   format,
@@ -250,8 +254,10 @@ function App() {
   const [dateFilterType, setDateFilterType] = useState<'deadline' | 'execution'>('deadline');
 
   // UI States
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isAiReportOpen, setIsAiReportOpen] = useState(false);
   const [isAiHistoryOpen, setIsAiHistoryOpen] = useState(false);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [isAiTemplateManagerOpen, setIsAiTemplateManagerOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -264,8 +270,6 @@ function App() {
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
-  const [aiSummary, setAiSummary] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -397,7 +401,7 @@ function App() {
           storage.getTasks(),
           storage.getTags(),
           storage.getStatuses(),
-          storage.getAISummaries(),
+          storedUser && ['admin', 'manager'].includes(storedUser.role) ? storage.getAISummaries() : Promise.resolve([]),
           storage.getClients(),
           bucketService.getBuckets(),
           phaseService.getPhases(),
@@ -825,36 +829,15 @@ function App() {
   };
 
   // --- AI HANDLERS ---
-  const handleGenerateSummary = async () => {
-    setIsAiModalOpen(true);
-    setIsAiLoading(true);
+  const handleGenerateSummary = () => setIsAiReportOpen(true);
 
-    // Analyze logs only for the current view
-    const logsToAnalyze = getFilteredLogs().slice(0, 100);
+  const handleAIReportGenerated = (report: AISummary) => {
+    setAiHistory(current => [report, ...current.filter(item => item.id !== report.id)]);
+  };
 
-    const summaryText = await geminiService.generateWeeklySummary(
-      logsToAnalyze,
-      users
-    );
-    setAiSummary(summaryText);
-
-    // Save to history
-    const newSummary: AISummary = {
-      id: generateUUID(),
-      date: new Date().toISOString(),
-      content: summaryText,
-      periodStart: dateRange.start
-        ? dateRange.start.toISOString()
-        : subDays(new Date(), 7).toISOString(),
-      periodEnd: dateRange.end
-        ? dateRange.end.toISOString()
-        : new Date().toISOString(),
-    };
-    await storage.saveAISummary(newSummary);
-    const updatedHistory = await storage.getAISummaries();
-    setAiHistory(updatedHistory);
-
-    setIsAiLoading(false);
+  const handleDeleteAIReport = async (id: string) => {
+    await aiService.deleteReport(id);
+    setAiHistory(current => current.filter(item => item.id !== id));
   };
 
   // --- FILTER HELPERS ---
@@ -1339,21 +1322,43 @@ function App() {
                       </button>
                     )}
 
-                    <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"></div>
+                    {isManager && <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"></div>}
 
-                    <button
-                      onClick={() => { setIsAiHistoryOpen(true); setIsConfigOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 hover:text-purple-600 transition-colors font-bold"
-                    >
-                      <History className="w-4 h-4" /> Histórico de Resumos IA
-                    </button>
+                    {currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => { setIsAiSettingsOpen(true); setIsConfigOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#E6FAFC] hover:text-[#374A67] transition-colors font-bold"
+                      >
+                        <Bot className="w-4 h-4" /> Configurar Inteligência Artificial
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => { handleGenerateSummary(); setIsConfigOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white bg-[#0E1116] hover:bg-gray-800 transition-colors font-bold mt-1"
-                    >
-                      <Sparkles className="w-4 h-4 text-[#374A67]" /> Gerar Resumo com IA
-                    </button>
+                    {currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => { setIsAiTemplateManagerOpen(true); setIsConfigOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#E6FAFC] hover:text-[#374A67] transition-colors font-bold"
+                      >
+                        <LayoutTemplate className="w-4 h-4" /> Templates de Relatórios IA
+                      </button>
+                    )}
+
+                    {isManager && (
+                      <button
+                        onClick={() => { setIsAiHistoryOpen(true); setIsConfigOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 hover:text-purple-600 transition-colors font-bold"
+                      >
+                        <History className="w-4 h-4" /> Histórico de Relatórios IA
+                      </button>
+                    )}
+
+                    {isManager && (
+                      <button
+                        onClick={() => { handleGenerateSummary(); setIsConfigOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white bg-[#0E1116] hover:bg-[#374A67] transition-colors font-bold mt-1"
+                      >
+                        <Sparkles className="w-4 h-4 text-[#E6FAFC]" /> Gerar Relatório com IA
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1827,18 +1832,39 @@ function App() {
       */}
 
       {/* MODALS */}
-      <SummaryModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-        content={aiSummary}
-        isLoading={isAiLoading}
-      />
+      {isManager && (
+        <AIReportModal
+          isOpen={isAiReportOpen}
+          onClose={() => setIsAiReportOpen(false)}
+          currentUser={currentUser}
+          areas={allowedAreas}
+          clients={clients}
+          users={dashboardUsers}
+          onGenerated={handleAIReportGenerated}
+          onConfigure={currentUser.role === 'admin' ? () => { setIsAiReportOpen(false); setIsAiSettingsOpen(true); } : undefined}
+        />
+      )}
 
       <AISummaryHistoryModal
         isOpen={isAiHistoryOpen}
         onClose={() => setIsAiHistoryOpen(false)}
         history={aiHistory}
+        onDelete={handleDeleteAIReport}
       />
+
+      {currentUser.role === 'admin' && (
+        <AISettingsModal
+          isOpen={isAiSettingsOpen}
+          onClose={() => setIsAiSettingsOpen(false)}
+        />
+      )}
+
+      {currentUser.role === 'admin' && (
+        <AIReportTemplateManagerModal
+          isOpen={isAiTemplateManagerOpen}
+          onClose={() => setIsAiTemplateManagerOpen(false)}
+        />
+      )}
 
       <TagManagerModal
         isOpen={isTagModalOpen}

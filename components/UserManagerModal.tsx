@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Area, Client } from '../types';
-import { X, Plus, Trash2, Users, Building2, UserPlus, Briefcase, Edit2, Save, CornerDownRight, Search, ShieldOff } from 'lucide-react';
+import { X, Plus, Trash2, Users, Building2, UserPlus, Briefcase, Edit2, Save, CornerDownRight, Search, ShieldOff, Mail } from 'lucide-react';
 import { generateUUID } from '../utils';
 import * as storage from '../services/storage';
 import { API_BASE_URL } from '../services/api';
@@ -31,6 +31,7 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
   const [newUserAreaId, setNewUserAreaId] = useState<string>('');
   const [newUserCpf, setNewUserCpf] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserHours, setNewUserHours] = useState<number>(160);
   const [newUserAvatarUrl, setNewUserAvatarUrl] = useState<string>('');
@@ -111,6 +112,7 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
     setNewUserAreaId(user.areaId);
     setNewUserCpf(user.cpf || '');
     setNewUserPhone(user.phone || '');
+    setNewUserEmail(user.email || '');
     setNewUserHours(user.available_hours || 160);
     setNewUserPassword(''); // always clear password input when editing
     setNewUserAvatarUrl(user.avatarUrl && !user.avatarUrl.includes('ui-avatars.com') ? user.avatarUrl : '');
@@ -123,6 +125,7 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
     setNewUserRole('member');
     setNewUserCpf('');
     setNewUserPhone('');
+    setNewUserEmail('');
     setNewUserPassword('');
     setNewUserHours(160);
     setNewUserAvatarUrl('');
@@ -169,7 +172,7 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
       // Update existing
       const updatedUsers = users.map(u =>
         u.id === editingUser.id
-          ? { ...u, name: newUserName.trim(), role: newUserRole, areaId: newUserAreaId, cpf: newUserCpf.trim() || undefined, phone: newUserPhone.trim() || undefined, available_hours: newUserHours, password: newUserPassword || undefined, avatarUrl: newUserAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim())}&background=random&color=fff`, pode_publicar: newUserPodePublicar }
+          ? { ...u, name: newUserName.trim(), role: newUserRole, areaId: newUserAreaId, cpf: newUserCpf.trim() || undefined, phone: newUserPhone.trim() || undefined, email: newUserEmail.trim().toLowerCase() || undefined, available_hours: newUserHours, password: newUserPassword || undefined, avatarUrl: newUserAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim())}&background=random&color=fff`, pode_publicar: newUserPodePublicar }
           : u
       );
       onSaveUsers(updatedUsers);
@@ -183,6 +186,7 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
         areaId: newUserAreaId,
         cpf: newUserCpf.trim() || undefined,
         phone: newUserPhone.trim() || undefined,
+        email: newUserEmail.trim().toLowerCase() || undefined,
         available_hours: newUserHours,
         password: newUserPassword || undefined,
         avatarUrl: newUserAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim())}&background=random&color=fff`,
@@ -416,6 +420,18 @@ export const UserManagerModal: React.FC<UserManagerModalProps> = ({
                     placeholder="Telefone"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#374A67] outline-none text-sm bg-white dark:bg-gray-800"
                     maxLength={15}
+                  />
+                </div>
+
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="E-mail para recuperação de senha"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#374A67] outline-none text-sm bg-white dark:bg-gray-800"
+                    maxLength={320}
                   />
                 </div>
 
